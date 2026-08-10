@@ -1,13 +1,21 @@
 <div align="center">
 
+<img src="./public/logo.svg" width="110" height="110" alt="Astraeon logo — a classical temple emblem in antique gold" />
+
 # ASTRAEON
 
 ### The programmable trust & execution layer for autonomous AI agents.
 
-**Autonomy without enforceable boundaries is not infrastructure.**
-Astraeon gives agents the power to act — without giving them unlimited power.
+_Autonomy without enforceable boundaries is not infrastructure._
 
-Built on **Rialo**.
+**Astraeon gives agents the power to act — without giving them unlimited power.**
+
+<img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white" />
+<img alt="React" src="https://img.shields.io/badge/React%2019-61DAFB?style=flat-square&logo=react&logoColor=111" />
+<img alt="TanStack Start" src="https://img.shields.io/badge/TanStack%20Start-000?style=flat-square&logo=tanstack&logoColor=white" />
+<img alt="Built on Rialo" src="https://img.shields.io/badge/Built%20on%20Rialo-c9a85c?style=flat-square&logoColor=white" />
+<img alt="Vitest" src="https://img.shields.io/badge/Vitest-6E9F18?style=flat-square&logo=vitest&logoColor=white" />
+<img alt="Vercel" src="https://img.shields.io/badge/Vercel-000?style=flat-square&logo=vercel&logoColor=white" />
 
 </div>
 
@@ -15,13 +23,9 @@ Built on **Rialo**.
 
 ## The Thesis
 
-AI agents are becoming autonomous economic actors: they read APIs, move money,
-interact with DeFi, talk to other agents, and act in the real world. Every bit of
-that autonomy is attack surface — prompt injection, leaked credentials, runaway
-spending, malicious tool output.
+AI agents are becoming autonomous economic actors: they read APIs, move money, interact with DeFi, talk to other agents, and act in the real world. Every bit of that autonomy is attack surface — prompt injection, leaked credentials, runaway spending, malicious tool output.
 
-Astraeon is the layer that sits between an agent and the real world and makes
-every action **bounded, auditable, and enforceable**:
+Astraeon is the layer between an agent and the real world that makes every action **bounded, auditable, and enforceable**:
 
 ```
 AGENT
@@ -36,8 +40,7 @@ RIALO      confidential execution, payments, automation, on-chain state
 WORLD      APIs · DeFi · Web2 · payments · other agents
 ```
 
-Astraeon does not replace agents. It is the trust infrastructure that lets agents
-act safely in the world.
+Astraeon does not replace agents. It is the trust infrastructure that lets agents act safely in the world.
 
 ---
 
@@ -62,49 +65,38 @@ act safely in the world.
 
 ## Real on-chain execution (Rialo DevNet)
 
-Astraeon is not a mockup. The engine talks to the **Rialo DevNet** node
-(`devnet.rialo.io:4100`) via JSON-RPC:
+Astraeon is not a mockup. The engine talks to the **Rialo DevNet** node (`devnet.rialo.io:4100`) via JSON-RPC:
 
-- Wallet: Ed25519 keypair (base58), generated in the browser.
-- **Signed transactions**: a System-Program transfer built to the exact Rialo wire
-  format, signed with the operator's key, submitted with `sendTransaction`, and
-  confirmed with `getSignatureStatuses`.
-- Execution amount is tied to the action (`amountUsd → kelvins`, floored at the
-  DevNet dust minimum).
-- Audit events carrying a real transaction hash can be **verified on-chain**
-  (`getTransaction` → block, fee, program logs).
-- The Rialo node is HTTP-only and sends no CORS headers, so a **same-origin proxy**
-  at `/api/rialo` (`src/server.ts`) forwards JSON-RPC server-side.
+- **Wallet** — Ed25519 keypair (base58), generated in the browser.
+- **Signed transactions** — a System-Program transfer built to the exact Rialo wire format, signed with the operator's key, submitted with `sendTransaction`, confirmed with `getSignatureStatuses`.
+- Execution amount is tied to the action (`amountUsd → kelvins`, floored at the DevNet dust minimum).
+- Audit events carrying a real transaction hash can be **verified on-chain** (`getTransaction` → block, fee, program logs).
+- The Rialo node is HTTP-only and sends no CORS headers, so a **same-origin proxy** at `/api/rialo` (`src/server.ts`) forwards JSON-RPC server-side.
 
-Everything degrades gracefully to simulation when the node is unreachable, so the
-product still demos fully offline.
+Everything degrades gracefully to simulation when the node is unreachable, so the product still demos fully offline.
 
 ---
 
 ## Security model
 
-- **Astraeon holds no keys.** The wallet belongs to the operator of the console;
-  the app signs on their behalf only after the console is unlocked.
-- **Operator gate**: destructive and on-chain operations require a session passcode
-  (default `astraeon`, overridable via `VITE_ASTRAEON_OPERATOR_CODE`). In production
-  this becomes server-side auth.
-- **Key persistence is opt-in.** By default the signing key lives in memory for the
-  session; "remember key" (browser storage) is a labelled, insecure-for-production
-  convenience for demo flows.
-- **Faucet abuse controls**: auto-funding is throttled, execution is cooldown-gated,
-  and in-flight locks prevent double-transfers.
-- Local state is schema-validated on load so tampered browser storage cannot inject
-  agents or policies.
+> **Astraeon holds no keys.** The wallet belongs to the operator of the console; the app signs on their behalf only after the console is unlocked.
+
+- **Operator gate** — destructive and on-chain operations require a session passcode (default `astraeon`, overridable via `VITE_ASTRAEON_OPERATOR_CODE`). In production this becomes server-side auth.
+- **Key persistence is opt-in** — by default the signing key lives in memory for the session; "remember key" (browser storage) is a labelled, insecure-for-production convenience for demo flows.
+- **Faucet abuse controls** — auto-funding is throttled, execution is cooldown-gated, and in-flight locks prevent double-transfers.
+- **Tamper resistance** — local state is schema-validated on load so manipulated browser storage cannot inject agents or policies.
 
 ---
 
 ## Tech stack
 
-- **TanStack Start** (React 19 + Vite) with SSR
-- **Tailwind CSS v4** — a classical-trust-meets-machine-intelligence design system
-- **TypeScript** (strict)
-- **Vitest** for the engine test suite
-- **Nitro** build (preset `vercel`) for deployment
+| Area | Choice |
+| --- | --- |
+| Framework | **TanStack Start** (React 19 + Vite) with SSR |
+| Styling | **Tailwind CSS v4** — classical-trust-meets-machine-intelligence design system |
+| Language | **TypeScript** (strict) |
+| Engine tests | **Vitest** |
+| Build / deploy | **Nitro** (preset `vercel`) → Vercel Build Output API |
 
 ```
 src/
@@ -142,8 +134,7 @@ npm install
 npm run dev        # http://localhost:8080
 ```
 
-Open **Command Center** → unlock with the operator passcode (`astraeon`) → run the
-**Guided Demo** (create agent → buy → withdraw blocked → velocity burst → pause).
+Open **Command Center** → unlock with the operator passcode (`astraeon`) → run the **Guided Demo** (create agent → buy → withdraw blocked → velocity burst → pause).
 
 Checks:
 
@@ -178,20 +169,18 @@ The build targets Vercel's Build Output API (nitro preset `vercel`, `vercel.json
 
 ## Roadmap
 
-- **V2** — multi-agent permissions, agent-to-agent authorization, subscriptions,
-  marketplace, escrow / agent labor, simulation previews.
-- **V3** — policy marketplace, gateway marketplace, enterprise controls, RWA
-  automation, DeFi autonomous management, an agent SDK (`@astraeon/*`).
-- **Production custody** — replace the in-browser signer with user-owned wallets /
-  delegated authority + an on-chain guard program on Rialo, so trust comes from
-  verifiability rather than a single operator.
+- **V2** — multi-agent permissions, agent-to-agent authorization, subscriptions, marketplace, escrow / agent labor, simulation previews.
+- **V3** — policy marketplace, gateway marketplace, enterprise controls, RWA automation, DeFi autonomous management, an agent SDK (`@astraeon/*`).
+- **Production custody** — replace the in-browser signer with user-owned wallets / delegated authority + an on-chain guard program on Rialo, so trust comes from verifiability rather than a single operator.
 
 ---
 
 <div align="center">
 
+<img src="./public/logo.svg" width="56" height="56" alt="Astraeon logo" />
+
 **Astraeon is the trust infrastructure for the autonomous economy.**
 
-*AI intelligence + Astraeon trust + Rialo execution = autonomous economic infrastructure.*
+_AI intelligence + Astraeon trust + Rialo execution = autonomous economic infrastructure._
 
 </div>
