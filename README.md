@@ -964,19 +964,9 @@ That visual metaphor should immediately communicate:
 
 INTELLIGENCE → POWER → CONTROL → TRUST.
 
-This project was built with [Lovable](https://lovable.dev).
-
-## Build with Lovable
-
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/387f41ee-390e-4d78-81c8-5ddcda398421).
-
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
-
 ## Development
 
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+You need Node.js (>=20) and npm.
 
 ```sh
 git clone <this-repository-url>
@@ -984,3 +974,29 @@ cd <repository-name>
 npm i
 npm run dev
 ```
+
+Run the checks:
+
+```sh
+npm test        # vitest test suite
+npm run lint    # eslint
+npm run build   # production build (nitro, vercel preset → .vercel/output)
+```
+
+## Deploy to Vercel
+
+The production build targets Vercel (nitro preset `vercel`, `vercel.json`). Connect the GitHub
+repository in Vercel; the build command `npm run build` emits `.vercel/output` and Vercel serves
+it via its Build Output API.
+
+Environment variables:
+
+- `RIALO_RPC_URL` — upstream Rialo RPC the server proxy forwards to (default
+  `http://devnet.rialo.io:4100`).
+- `VITE_RIALO_RPC_URL` — client override; leave unset to use the same-origin proxy `/api/rialo`.
+- `VITE_ASTRAEON_OPERATOR_CODE` — operator passcode for the command console (default `astraeon`).
+
+> The Rialo DevNet node is HTTP-only and sends no CORS headers, so browsers cannot call it
+> directly. `src/server.ts` exposes a same-origin JSON-RPC proxy at `/api/rialo` that forwards
+> requests server-side — required for real on-chain execution to work from the browser.
+

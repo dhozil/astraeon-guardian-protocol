@@ -12,4 +12,8 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  // Deploy target: Vercel. Outside a Lovable build this pins the nitro preset,
+  // so `npm run build` emits a Vercel-ready server bundle. NITRO_PRESET also wins
+  // at deploy time, so this is a belt-and-suspenders default.
+  nitro: { preset: "vercel" },
 });
