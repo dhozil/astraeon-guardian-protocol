@@ -1,0 +1,8 @@
+package rialo:astraeon-guard@0.1.0;
+
+use rialo:primitives@0.1.0.{pubkey, lamports, timestamp, error};
+
+world astraeon-guard {
+    export evaluate: func(action: string, asset: string, amount: u64, destination: string) -> result<_, error>;
+    export initialize: func(max-amount: u64, allow-withdraw: bool, allowed-assets: string) -> result<_, error>;
+}

@@ -1,0 +1,21 @@
+[package]
+name = "astraeon-guard"
+description = "Astraeon on-chain guard: policy evaluation + audit record as a Rialo Venus workflow"
+authors = ["Astraeon"]
+license = "Apache-2.0"
+publish = false
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+implementation = []
+
+[dependencies]
+rialo-s-program = { version = "=0.17.0-alpha.0", default-features = false }
+rialo-s-program-error = { version = "=0.17.0-alpha.0", features = ["borsh"] }
+rialo-venus = { version = "=0.17.0-alpha.0" }
+rialo-venus-proc-macro = { version = "=0.17.0-alpha.0" }
+serde = { version = "1.0.219", features = ["derive", "rc"] }
+serde_json = { version = "1.0.143", features = ["alloc", "preserve_order", "raw_value"] }
