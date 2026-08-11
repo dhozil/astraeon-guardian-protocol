@@ -69,6 +69,8 @@ Astraeon is not a mockup. The engine talks to the **Rialo DevNet** node (`devnet
 
 - **Wallet** — Ed25519 keypair (base58), generated in the browser.
 - **Signed transactions** — a System-Program transfer built to the exact Rialo wire format, signed with the operator's key, submitted with `sendTransaction`, confirmed with `getSignatureStatuses`.
+- **Guard program on-chain** — the Astraeon guard is **deployed and live** on DevNet
+  (`EiKYpXrsCBU2ZqbCpLuLBPGfjFzBwt1ynsqNLdHAnA97`). When `VITE_RIALO_GUARD_PROGRAM` is set (it defaults to the deployed program), execution invokes the program's `evaluate(...)` instruction, so the allow/deny decision comes from the chain, not the frontend.
 - Execution amount is tied to the action (`amountUsd → kelvins`, floored at the DevNet dust minimum).
 - Audit events carrying a real transaction hash can be **verified on-chain** (`getTransaction` → block, fee, program logs).
 - The Rialo node is HTTP-only and sends no CORS headers, so a **same-origin proxy** at `/api/rialo` (`src/server.ts`) forwards JSON-RPC server-side.

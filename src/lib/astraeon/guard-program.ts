@@ -12,6 +12,28 @@ export const GUARD_WELL_KNOWN = {
   rexProcessor: "Qrac1eProcessor1111111111111111111111111111",
 } as const;
 
+/**
+ * The Astraeon guard program deployed on Rialo DevNet
+ * (`rialo-build` → PolkaVM blob → `client program deploy`).
+ */
+export const GUARD_PROGRAM_ID_DEVNET = "EiKYpXrsCBU2ZqbCpLuLBPGfjFzBwt1ynsqNLdHAnA97";
+
+/**
+ * Deterministic workflow slug (SHA-256 of "astraeon-guard-policy") so the
+ * frontend targets the same workflow instance the policy was initialized on.
+ */
+export const GUARD_DEFAULT_SLUG_HEX =
+  "5894a746cf7c289fc5035596c7541a259c8515aa5ba9c94aca20f2d0e0faf624";
+
+export function slugFromHex(hex: string): Uint8Array {
+  if (hex.length !== 64) throw new Error("workflow slug must be 64 hex chars");
+  const out = new Uint8Array(32);
+  for (let i = 0; i < 32; i += 1) out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  return out;
+}
+
+export const GUARD_DEFAULT_SLUG = slugFromHex(GUARD_DEFAULT_SLUG_HEX);
+
 /** Instruction discriminants from the manifest (bincode enum variant). */
 export const GUARD_INSTRUCTION = {
   evaluate: 0,

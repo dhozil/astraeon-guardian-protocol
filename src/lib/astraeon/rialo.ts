@@ -2,17 +2,22 @@ import type { Asset } from "./types";
 import { nextId } from "./audit";
 import { importSigningKey } from "./wallet";
 import { buildTransferMessage, buildTransaction, toBase64 } from "./tx";
-import { buildEvaluateData, buildGuardInvokeMessage } from "./guard-program";
+import {
+  buildEvaluateData,
+  buildGuardInvokeMessage,
+  GUARD_DEFAULT_SLUG,
+  GUARD_PROGRAM_ID_DEVNET,
+} from "./guard-program";
 
 async function sha256(bytes: Uint8Array): Promise<Uint8Array> {
   return new Uint8Array(await crypto.subtle.digest("SHA-256", bytes.buffer as ArrayBuffer));
 }
 
-/** Guard program id override, e.g. set VITE_RIALO_GUARD_PROGRAM after deploy. */
+/** Guard program id; default to the deployed DevNet program, overridable via env. */
 export function rialoGuardProgram(): string {
   const env = import.meta.env as Record<string, unknown> | undefined;
   const url = env?.["VITE_RIALO_GUARD_PROGRAM"];
-  return typeof url === "string" && url.trim() !== "" ? url.trim() : "";
+  return typeof url === "string" && url.trim() !== "" ? url.trim() : GUARD_PROGRAM_ID_DEVNET;
 }
 
 export interface RialoExecutionRequest {
@@ -660,7 +665,7 @@ export class RialoExecutor {
       const configHashPrefix = await transport.getConfigHashPrefix();
       const signingKey = await importSigningKey(opts.privateKeyJwk);
       const kelvin = opts.kelvins != null ? BigInt(opts.kelvins) : kelvinForAction(req, 10_000_000);
-      const slug = crypto.getRandomValues(new Uint8Array(32));
+      const slug = GUARD_DEFAULT_SLUG;
       const data = buildEvaluateData({
         slug,
         action: (req.actionType ?? req.actionLabel).toLowerCase(),
@@ -668,7 +673,6 @@ export class RialoExecutor {
         amountKelvin: kelvin,
         destination: req.destinationId ?? "",
       });
-
       let tx: { signature: string; block: number; executed: boolean } | undefined;
       const offsets = [0, 1500, 3000, 5000, 7000];
       for (const offset of offsets) {
