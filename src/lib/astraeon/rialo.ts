@@ -2,15 +2,29 @@ import type { Asset } from "./types";
 import { nextId } from "./audit";
 import { importSigningKey } from "./wallet";
 import { buildTransferMessage, buildTransaction, toBase64 } from "./tx";
+import { buildEvaluateData, buildGuardInvokeMessage } from "./guard-program";
+
+async function sha256(bytes: Uint8Array): Promise<Uint8Array> {
+  return new Uint8Array(await crypto.subtle.digest("SHA-256", bytes.buffer as ArrayBuffer));
+}
+
+/** Guard program id override, e.g. set VITE_RIALO_GUARD_PROGRAM after deploy. */
+export function rialoGuardProgram(): string {
+  const env = import.meta.env as Record<string, unknown> | undefined;
+  const url = env?.["VITE_RIALO_GUARD_PROGRAM"];
+  return typeof url === "string" && url.trim() !== "" ? url.trim() : "";
+}
 
 export interface RialoExecutionRequest {
   agentId: string;
   agentName: string;
   actionLabel: string;
+  actionType?: string | undefined;
   asset?: Asset | undefined;
   amountUsd?: number | undefined;
   method?: string | undefined;
   destination?: string | undefined;
+  destinationId?: string | undefined;
 }
 
 export interface RialoSimulation {
@@ -484,6 +498,7 @@ export class RialoExecutor {
       privateKeyJwk?: string | undefined;
       kelvins?: number | undefined;
       cooldownMs?: number | undefined;
+      guardProgramId?: string | undefined;
     } = { address: "", cooldownMs: 2500 },
   ): Promise<RialoExecutionResult> {
     const sim = this.transport.execute(req);
@@ -508,6 +523,12 @@ export class RialoExecutor {
     try {
       // Real signed transfer
       if (opts.recipient && opts.privateKeyJwk) {
+        // If a guard program is configured, execution calls the on-chain
+        // guard's `evaluate` instruction instead of a plain transfer.
+        const guardProgramId = opts.guardProgramId ?? rialoGuardProgram();
+        if (guardProgramId) {
+          return this.invokeGuardProgram(req, { ...opts, programId: guardProgramId });
+        }
         const balance = await transport.getBalance(opts.address);
         // DevNet rejects dust transfers below ~0.01 RLO, so the execution
         // amount stays above the minimum. Auto-funding is throttled to once
@@ -586,6 +607,108 @@ export class RialoExecutor {
       return {
         ...sim,
         result: `${req.actionLabel} simulated (on-chain error: ${err instanceof Error ? err.message : String(err)})`,
+      };
+    }
+  }
+
+  /**
+   * Real on-chain execution through the deployed Astraeon guard program. Builds
+   * the `evaluate(action, asset, amount, destination)` instruction from the
+   * Venus manifest, signs and submits it, and confirms the signature. Requires
+   * the program to be deployed; the exact wire encoding follows the generated
+   * manifest (bincode) — verify against the deployed program on first run.
+   */
+  async invokeGuardProgram(
+    req: RialoExecutionRequest,
+    opts: {
+      address: string;
+      programId: string;
+      privateKeyJwk?: string | undefined;
+      kelvins?: number | undefined;
+      cooldownMs?: number | undefined;
+    },
+  ): Promise<RialoExecutionResult> {
+    const sim = this.transport.execute(req);
+    const transport = this.transport as RialoJsonRpcTransport | null;
+    if (!(transport instanceof RialoJsonRpcTransport)) return sim;
+    if (!this.connection.reachable)
+      return { ...sim, result: `${req.actionLabel} simulated (Rialo RPC unreachable)` };
+    const now = Date.now();
+    const cooldownMs = opts.cooldownMs ?? 2500;
+    if (now - this.lastRealTxAt < cooldownMs) {
+      return {
+        ...sim,
+        result: `${req.actionLabel} simulated (rate-limited, last on-chain tx ${Math.round((now - this.lastRealTxAt) / 1000)}s ago)`,
+      };
+    }
+    if (!opts.address || !opts.privateKeyJwk)
+      return { ...sim, result: `${req.actionLabel} simulated (no on-chain wallet)` };
+    try {
+      const balance = await transport.getBalance(opts.address);
+      if (balance < 11_000_000) {
+        if (Date.now() - this.lastAutoFundAt >= AUTO_FUND_COOLDOWN_MS) {
+          await transport.airdropAndConfirm(opts.address, 1_000_000_000);
+          this.lastAutoFundAt = Date.now();
+        } else {
+          return {
+            ...sim,
+            result: `${req.actionLabel} simulated (wallet unfunded; auto-fund cooling down)`,
+          };
+        }
+      }
+
+      const configHashPrefix = await transport.getConfigHashPrefix();
+      const signingKey = await importSigningKey(opts.privateKeyJwk);
+      const kelvin = opts.kelvins != null ? BigInt(opts.kelvins) : kelvinForAction(req, 10_000_000);
+      const slug = crypto.getRandomValues(new Uint8Array(32));
+      const data = buildEvaluateData({
+        slug,
+        action: (req.actionType ?? req.actionLabel).toLowerCase(),
+        asset: req.asset ?? "",
+        amountKelvin: kelvin,
+        destination: req.destinationId ?? "",
+      });
+
+      let tx: { signature: string; block: number; executed: boolean } | undefined;
+      const offsets = [0, 1500, 3000, 5000, 7000];
+      for (const offset of offsets) {
+        const message = await buildGuardInvokeMessage({
+          feePayer: opts.address,
+          programId: opts.programId,
+          slug,
+          data,
+          validFrom: Date.now() - offset,
+          configHashPrefix,
+          sha256,
+        });
+        const signature = new Uint8Array(
+          await crypto.subtle.sign("Ed25519", signingKey, message.buffer as ArrayBuffer),
+        );
+        const txBytes = buildTransaction(message, signature);
+        try {
+          tx = await transport.sendAndConfirmTransaction(toBase64(txBytes));
+          break;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (!msg.includes("TimestampInFuture")) throw err;
+          await new Promise((r) => setTimeout(r, 300));
+        }
+      }
+      if (!tx) throw new Error("guard invoke could not be submitted (TimestampInFuture)");
+      this.lastRealTxAt = Date.now();
+      return {
+        txHash: tx.signature,
+        block: tx.block,
+        gasUsed: sim.gasUsed,
+        status: tx.executed ? "CONFIRMED" : "FAILED",
+        simulated: false,
+        result: `${req.actionLabel} evaluated on-chain by guard program ${shortAddress(opts.programId)}`,
+        network: this.network,
+      };
+    } catch (err) {
+      return {
+        ...sim,
+        result: `${req.actionLabel} simulated (guard invoke error: ${err instanceof Error ? err.message : String(err)})`,
       };
     }
   }

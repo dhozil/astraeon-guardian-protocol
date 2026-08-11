@@ -15,6 +15,87 @@ function pushUint64LE(buf: number[], value: bigint): void {
   for (let i = 0; i < 8; i += 1) buf.push(Number((value >> BigInt(i * 8)) & 0xffn));
 }
 
+/** bincode u32 little-endian. */
+function pushUint32LE(buf: number[], value: number): void {
+  buf.push(value & 0xff, (value >> 8) & 0xff, (value >> 16) & 0xff, (value >> 24) & 0xff);
+}
+
+/** bincode string: u64 LE byte length + UTF-8 bytes. */
+function pushString(buf: number[], value: string): void {
+  const bytes = Array.from(new TextEncoder().encode(value));
+  pushUint64LE(buf, BigInt(bytes.length));
+  buf.push(...bytes);
+}
+
+export { pushUint32LE, pushString };
+
+export interface InvokeAccount {
+  pubkey: string;
+  isSigner: boolean;
+  isWritable: boolean;
+}
+
+export interface InvokeMessageParams {
+  feePayer: string;
+  programId: string;
+  accounts: InvokeAccount[];
+  data: Uint8Array;
+  validFrom: number;
+  configHashPrefix: bigint;
+}
+
+/**
+ * Builds a Rialo transaction message that invokes a program instruction,
+ * following the same wire format as rialo-cdk's TransactionBuilder: fee payer
+ * first, then instruction accounts, then the program id; 3-byte header,
+ * compact-u16 arrays, valid_from i64 LE, config hash prefix u64 LE, occ flag.
+ */
+export function buildInvokeMessage(params: InvokeMessageParams): Uint8Array {
+  const buf: number[] = [];
+
+  const accountKeys = [params.feePayer, ...params.accounts.map((a) => a.pubkey), params.programId];
+
+  // header: required signatures, readonly signed, readonly unsigned (incl. program id)
+  const numRequired = params.accounts.filter((a) => a.isSigner).length + 1;
+  const numReadonlySigned = params.accounts.filter((a) => a.isSigner && !a.isWritable).length;
+  const numReadonlyUnsigned =
+    params.accounts.filter((a) => !a.isSigner && !a.isWritable).length + 1; // + program id
+  buf.push(numRequired, numReadonlySigned, numReadonlyUnsigned);
+
+  // account_keys compact-array
+  compactU16(buf, accountKeys.length);
+  for (const k of accountKeys) {
+    const raw = bs58Decode(k);
+    if (raw.length !== 32) throw new Error(`invalid pubkey length for ${k}`);
+    buf.push(...raw);
+  }
+
+  // valid_from i64 LE (milliseconds since epoch)
+  pushUint64LE(buf, BigInt(params.validFrom));
+
+  // config_hash_prefix u64 LE
+  pushUint64LE(buf, params.configHashPrefix);
+
+  // occ scheduler flag
+  buf.push(0);
+
+  // instructions compact-array: 1 instruction
+  compactU16(buf, 1);
+
+  // program index = feePayer(0) + accounts length
+  buf.push(params.accounts.length + 1);
+
+  // account indices compact-array: [0 (fee payer), 1..n]
+  compactU16(buf, params.accounts.length + 1);
+  for (let i = 0; i <= params.accounts.length; i += 1) buf.push(i);
+
+  // instruction data compact-array
+  compactU16(buf, params.data.length);
+  buf.push(...params.data);
+
+  return Uint8Array.from(buf);
+}
+
 export interface TransferMessageParams {
   feePayer: string;
   to: string;

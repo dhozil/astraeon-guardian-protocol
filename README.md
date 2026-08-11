@@ -46,20 +46,20 @@ Astraeon does not replace agents. It is the trust infrastructure that lets agent
 
 ## What it does
 
-| Capability | What it means |
-| --- | --- |
-| **Agent Identity** | Every agent gets a verifiable identity and delegated, scoped authority. |
-| **Policy Engine** | Declarative boundaries: assets, amounts, budgets, velocity, slippage, destinations. |
-| **Risk Engine** | Scores every action 0–100 before execution (SAFE → CRITICAL). |
-| **Credential Gateway** | Agents ask for a path; Astraeon binds the vaulted credential. Raw keys never reach the model. |
-| **Transaction Guard** | Decode → policy → risk → simulate → approve/deny, with explainable reasons. |
-| **Spending & Velocity** | Per-tx / daily / weekly / monthly caps and request-rate limits. |
-| **Anomaly Detection** | Velocity bursts, critical-risk actions, policy escapes → auto-pause. |
-| **Emergency Brake** | Pause, resume, or revoke an agent instantly. |
-| **Audit Trail** | Every action recorded — and **verifiable on-chain** against the Rialo node. |
-| **Reputation** | A trust tier derived from verifiable behavior, not claims. |
-| **Human-in-the-Loop** | High-value actions route to approvals before execution. |
-| **Wallet-gated actions** | Viewing is open to everyone; on-chain actions create (and sign with) the operator wallet. |
+| Capability               | What it means                                                                                 |
+| ------------------------ | --------------------------------------------------------------------------------------------- |
+| **Agent Identity**       | Every agent gets a verifiable identity and delegated, scoped authority.                       |
+| **Policy Engine**        | Declarative boundaries: assets, amounts, budgets, velocity, slippage, destinations.           |
+| **Risk Engine**          | Scores every action 0–100 before execution (SAFE → CRITICAL).                                 |
+| **Credential Gateway**   | Agents ask for a path; Astraeon binds the vaulted credential. Raw keys never reach the model. |
+| **Transaction Guard**    | Decode → policy → risk → simulate → approve/deny, with explainable reasons.                   |
+| **Spending & Velocity**  | Per-tx / daily / weekly / monthly caps and request-rate limits.                               |
+| **Anomaly Detection**    | Velocity bursts, critical-risk actions, policy escapes → auto-pause.                          |
+| **Emergency Brake**      | Pause, resume, or revoke an agent instantly.                                                  |
+| **Audit Trail**          | Every action recorded — and **verifiable on-chain** against the Rialo node.                   |
+| **Reputation**           | A trust tier derived from verifiable behavior, not claims.                                    |
+| **Human-in-the-Loop**    | High-value actions route to approvals before execution.                                       |
+| **Wallet-gated actions** | Viewing is open to everyone; on-chain actions create (and sign with) the operator wallet.     |
 
 ---
 
@@ -90,13 +90,13 @@ Everything degrades gracefully to simulation when the node is unreachable, so th
 
 ## Tech stack
 
-| Area | Choice |
-| --- | --- |
-| Framework | **TanStack Start** (React 19 + Vite) with SSR |
-| Styling | **Tailwind CSS v4** — classical-trust-meets-machine-intelligence design system |
-| Language | **TypeScript** (strict) |
-| Engine tests | **Vitest** |
-| Build / deploy | **Nitro** (preset `vercel`) → Vercel Build Output API |
+| Area           | Choice                                                                         |
+| -------------- | ------------------------------------------------------------------------------ |
+| Framework      | **TanStack Start** (React 19 + Vite) with SSR                                  |
+| Styling        | **Tailwind CSS v4** — classical-trust-meets-machine-intelligence design system |
+| Language       | **TypeScript** (strict)                                                        |
+| Engine tests   | **Vitest**                                                                     |
+| Build / deploy | **Nitro** (preset `vercel`) → Vercel Build Output API                          |
 
 ```
 src/
@@ -148,10 +148,11 @@ npm run build     # production build → .vercel/output
 
 ## Environment variables
 
-| Variable | Purpose | Default |
-| --- | --- | --- |
-| `RIALO_RPC_URL` | Upstream Rialo RPC for the server proxy | `http://devnet.rialo.io:4100` |
-| `VITE_RIALO_RPC_URL` | Client override; leave unset for the same-origin proxy | `/api/rialo` |
+| Variable                   | Purpose                                                                                                           | Default                       |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| `RIALO_RPC_URL`            | Upstream Rialo RPC for the server proxy                                                                           | `http://devnet.rialo.io:4100` |
+| `VITE_RIALO_RPC_URL`       | Client override; leave unset for the same-origin proxy                                                            | `/api/rialo`                  |
+| `VITE_RIALO_GUARD_PROGRAM` | Base58 address of the deployed guard program; when set, execution calls `evaluate` on-chain instead of a transfer | (unset)                       |
 
 ---
 
