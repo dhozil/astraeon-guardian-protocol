@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TempleMark, RialoMark } from "@/components/astraeon/primitives";
 import { useAstraeon } from "@/lib/astraeon/store";
@@ -43,13 +44,19 @@ function Sidebar({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
     <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col justify-between border-r border-hairline bg-background/80 backdrop-blur-xl">
       <div>
         <div className="flex items-center gap-2.5 border-b border-hairline px-5 py-5">
-          <TempleMark className="h-7 w-7" />
-          <div className="leading-none">
-            <p className="font-display text-sm tracking-[0.24em] text-foreground">ASTRAEON</p>
-            <p className="mt-1.5 text-[0.48rem] tracking-[0.3em] text-gold/70 uppercase">
-              Trust. Execute. Empower.
-            </p>
-          </div>
+          <a
+            href="/"
+            className="flex items-center gap-2.5 transition-opacity hover:opacity-90"
+            title="Back to Astraeon site"
+          >
+            <TempleMark className="h-7 w-7" />
+            <div className="leading-none">
+              <p className="font-display text-sm tracking-[0.24em] text-foreground">ASTRAEON</p>
+              <p className="mt-1.5 text-[0.48rem] tracking-[0.3em] text-gold/70 uppercase">
+                Trust. Execute. Empower.
+              </p>
+            </div>
+          </a>
         </div>
         <nav className="px-3 py-4">
           {TABS.map((t) => {
@@ -83,6 +90,12 @@ function Sidebar({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
         </nav>
       </div>
       <div className="border-t border-hairline px-5 py-4">
+        <a
+          href="/"
+          className="mb-4 flex items-center justify-center gap-2 border border-gold/40 px-4 py-2.5 text-[0.62rem] font-semibold tracking-[0.18em] text-gold uppercase transition-colors hover:bg-gold/10"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" /> Back to Site
+        </a>
         <div className="flex items-center justify-between border border-hairline px-3 py-2.5">
           <div className="flex items-center gap-2">
             <StatusDot className={connection.reachable ? "text-ok" : "text-warn"} />
