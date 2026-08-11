@@ -555,6 +555,9 @@ export class RialoExecutor {
         }
         const configHashPrefix = await transport.getConfigHashPrefix();
         const signingKey = await importSigningKey(opts.privateKeyJwk);
+        // Use the node's own clock as the valid_from base so transactions are
+        // never rejected as TimestampInFuture by client/node clock skew.
+        const nodeTimeMs = await transport.getNodeTimeMs();
 
         // The node's TimestampInFuture check is nondeterministic against a
         // client clock that runs a few seconds ahead, so retry with a stepped
@@ -566,7 +569,7 @@ export class RialoExecutor {
             feePayer: opts.address,
             to: opts.recipient,
             kelvin,
-            validFrom: Date.now() - offset,
+            validFrom: nodeTimeMs - offset,
             configHashPrefix,
           });
           const signature = new Uint8Array(
@@ -661,7 +664,6 @@ export class RialoExecutor {
           };
         }
       }
-
       const configHashPrefix = await transport.getConfigHashPrefix();
       const signingKey = await importSigningKey(opts.privateKeyJwk);
       const kelvin = opts.kelvins != null ? BigInt(opts.kelvins) : kelvinForAction(req, 10_000_000);
@@ -673,6 +675,8 @@ export class RialoExecutor {
         amountKelvin: kelvin,
         destination: req.destinationId ?? "",
       });
+      const nodeTimeMs = await transport.getNodeTimeMs();
+
       let tx: { signature: string; block: number; executed: boolean } | undefined;
       const offsets = [0, 1500, 3000, 5000, 7000];
       for (const offset of offsets) {
@@ -681,7 +685,7 @@ export class RialoExecutor {
           programId: opts.programId,
           slug,
           data,
-          validFrom: Date.now() - offset,
+          validFrom: nodeTimeMs - offset,
           configHashPrefix,
           sha256,
         });
