@@ -12,7 +12,6 @@ import { VaultPanel } from "./vault-panel";
 import { ApprovalsPanel } from "./approvals-panel";
 import { DemoPanel } from "./demo-panel";
 import { AnomalyPanel } from "./anomaly-panel";
-import { OperatorGate } from "./operator-gate";
 import { StatusDot } from "./bits";
 
 type Tab =
@@ -130,8 +129,7 @@ function Header({
 
 export function CommandCenterApp() {
   const [tab, setTab] = useState<Tab>("overview");
-  const { state, connection, refreshConnection, treasury, operatorUnlocked, lockOperator } =
-    useAstraeon();
+  const { state, connection, refreshConnection, treasury } = useAstraeon();
 
   const panels: Record<Tab, ReactNode> = {
     overview: <OverviewPanel />,
@@ -186,23 +184,6 @@ export function CommandCenterApp() {
             <div className="flex items-center gap-3 text-[0.6rem] text-muted-foreground">
               <span
                 className={`flex items-center gap-2 border px-2.5 py-1.5 tracking-wider ${
-                  operatorUnlocked ? "border-ok/40 text-ok" : "border-crimson/40 text-crimson"
-                }`}
-                title="Operator session"
-              >
-                <StatusDot /> {operatorUnlocked ? "Operator active" : "Locked"}
-              </span>
-              {operatorUnlocked ? (
-                <button
-                  type="button"
-                  onClick={lockOperator}
-                  className="border border-hairline px-2.5 py-1.5 tracking-wider transition-colors hover:border-crimson/50 hover:text-crimson"
-                >
-                  Lock
-                </button>
-              ) : null}
-              <span
-                className={`flex items-center gap-2 border px-2.5 py-1.5 tracking-wider ${
                   connection.reachable ? "border-ok/40 text-ok" : "border-warn/40 text-warn"
                 }`}
               >
@@ -221,9 +202,9 @@ export function CommandCenterApp() {
               </button>
               <span
                 className="border border-hairline px-2.5 py-1.5 tracking-wider"
-                title="Operator wallet (owned by the console operator)"
+                title="Operator wallet (created on first on-chain action)"
               >
-                {treasury ? truncateAddress(treasury.address) : "…"}
+                {treasury ? truncateAddress(treasury.address) : "wallet: —"}
               </span>
               {connection.balanceKelvin != null && connection.reachable ? (
                 <span className="border border-hairline px-2.5 py-1.5 tracking-wider text-gold/80">
@@ -233,7 +214,7 @@ export function CommandCenterApp() {
             </div>
           }
         />
-        <div className="px-8 py-8">{operatorUnlocked ? panels[tab] : <OperatorGate />}</div>
+        <div className="px-8 py-8">{panels[tab]}</div>
       </main>
     </div>
   );

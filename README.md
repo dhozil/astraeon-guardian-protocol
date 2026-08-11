@@ -59,7 +59,7 @@ Astraeon does not replace agents. It is the trust infrastructure that lets agent
 | **Audit Trail** | Every action recorded — and **verifiable on-chain** against the Rialo node. |
 | **Reputation** | A trust tier derived from verifiable behavior, not claims. |
 | **Human-in-the-Loop** | High-value actions route to approvals before execution. |
-| **Operator Gate** | The console is locked behind an operator passcode; on-chain execution requires authorization. |
+| **Wallet-gated actions** | Viewing is open to everyone; on-chain actions create (and sign with) the operator wallet. |
 
 ---
 
@@ -81,7 +81,7 @@ Everything degrades gracefully to simulation when the node is unreachable, so th
 
 > **Astraeon holds no keys.** The wallet belongs to the operator of the console; the app signs on their behalf only after the console is unlocked.
 
-- **Operator gate** — destructive and on-chain operations require a session passcode (default `astraeon`, overridable via `VITE_ASTRAEON_OPERATOR_CODE`). In production this becomes server-side auth.
+- **Viewing is open; acting needs a wallet** — browsing the dashboards requires nothing. The operator wallet (Ed25519) is created automatically in the browser on the first on-chain action, so no login or wallet-connection step stands between a visitor and the demo.
 - **Key persistence is opt-in** — by default the signing key lives in memory for the session; "remember key" (browser storage) is a labelled, insecure-for-production convenience for demo flows.
 - **Faucet abuse controls** — auto-funding is throttled, execution is cooldown-gated, and in-flight locks prevent double-transfers.
 - **Tamper resistance** — local state is schema-validated on load so manipulated browser storage cannot inject agents or policies.
@@ -134,7 +134,7 @@ npm install
 npm run dev        # http://localhost:8080
 ```
 
-Open **Command Center** → unlock with the operator passcode (`astraeon`) → run the **Guided Demo** (create agent → buy → withdraw blocked → velocity burst → pause).
+Open **Command Center** → run the **Guided Demo** (create agent → buy → withdraw blocked → velocity burst → pause). Your operator wallet is created automatically on the first on-chain action.
 
 Checks:
 
@@ -152,7 +152,6 @@ npm run build     # production build → .vercel/output
 | --- | --- | --- |
 | `RIALO_RPC_URL` | Upstream Rialo RPC for the server proxy | `http://devnet.rialo.io:4100` |
 | `VITE_RIALO_RPC_URL` | Client override; leave unset for the same-origin proxy | `/api/rialo` |
-| `VITE_ASTRAEON_OPERATOR_CODE` | Operator passcode for the console | `astraeon` |
 
 ---
 

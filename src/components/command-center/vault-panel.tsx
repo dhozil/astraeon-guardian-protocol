@@ -43,10 +43,12 @@ export function VaultPanel() {
           <div>
             <p className="label-micro">Address (Ed25519 / base58)</p>
             <p className="mt-2 font-mono text-[0.72rem] text-gold">
-              {treasury ? treasury.address : "generating…"}
+              {treasury ? treasury.address : "not created yet"}
             </p>
             <p className="mt-1 text-[0.6rem] text-muted-foreground">
-              {treasury ? `generated ${new Date(treasury.createdAt).toLocaleString()}` : ""}
+              {treasury
+                ? `generated ${new Date(treasury.createdAt).toLocaleString()}`
+                : "created automatically on your first on-chain action"}
             </p>
           </div>
           <div>
@@ -60,7 +62,7 @@ export function VaultPanel() {
               </Pill>
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-3">
-              <GoldSolidButton onClick={fund} disabled={funding || !treasury}>
+              <GoldSolidButton onClick={fund} disabled={funding}>
                 {funding ? "Funding…" : "Fund +1 RLO"}
               </GoldSolidButton>
               {fundResult ? (

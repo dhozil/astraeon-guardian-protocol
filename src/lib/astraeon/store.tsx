@@ -420,36 +420,6 @@ function applyResult(state: AstraeonState, result: GuardResult): AstraeonState {
   return next;
 }
 
-function lockedResult(request: ActionRequest): GuardResult {
-  return {
-    event: {
-      id: nextId("ev"),
-      agentId: request.agentId,
-      agentName: "locked",
-      timestamp: isoNow(),
-      type: request.type,
-      actionLabel: "OPERATOR LOCKED",
-      decision: "DENIED",
-      verdict: "DENY",
-      riskScore: 100,
-      riskTier: "CRITICAL",
-      reason: "operator console locked",
-      status: "BLOCKED",
-      system: true,
-    },
-    decision: {
-      verdict: "DENY",
-      riskScore: 100,
-      riskTier: "CRITICAL",
-      checks: [],
-      reason: "operator console locked",
-      approvalsRequired: 0,
-    },
-    anomalies: [],
-    shouldPause: false,
-  };
-}
-
 function pauseAgent(state: AstraeonState, agentId: string, reason: string): AstraeonState {
   return {
     ...state,
@@ -480,10 +450,7 @@ export interface StoreApi {
   treasury: RialoWallet | null;
   rememberKey: boolean;
   setRememberKey(value: boolean): void;
-  operatorUnlocked: boolean;
-  operatorPasscode: string;
-  unlockOperator(code: string): boolean;
-  lockOperator(): void;
+  ensureTreasury(): Promise<RialoWallet | null>;
   refreshConnection(): Promise<RialoConnectionInfo>;
   refreshChainInfo(): Promise<ChainInfo | null>;
   fundTreasury(): Promise<RialoExecutionResult | null>;
@@ -504,20 +471,6 @@ const StoreContext = createContext<StoreApi | null>(null);
 const STORAGE_KEY = "astraeon-state-v1";
 const WALLET_KEY = "astraeon-wallet-v1";
 const WALLET_PREFS_KEY = "astraeon-wallet-prefs-v1";
-const OP_UNLOCK_KEY = "astraeon-operator-unlocked";
-
-/**
- * Operator passcode for this demo console. In production this is server-side
- * authentication; here it is a client-side gate that resets each session to
- * demonstrate that destructive/on-chain operations require operator
- * authorization.
- */
-const envCode =
-  typeof import.meta.env !== "undefined"
-    ? import.meta.env["VITE_ASTRAEON_OPERATOR_CODE"]
-    : undefined;
-export const OPERATOR_PASSCODE =
-  typeof envCode === "string" && envCode.trim() !== "" ? envCode : "astraeon";
 
 function isValidState(s: unknown): s is AstraeonState {
   if (!s || typeof s !== "object") return false;
@@ -581,16 +534,8 @@ export function AstraeonProvider({ children }: { children: ReactNode }) {
   const [chainInfo, setChainInfo] = useState<ChainInfo | null>(null);
   const [treasury, setTreasury] = useState<RialoWallet | null>(null);
   const [rememberKey, setRememberKeyState] = useState(false);
-  const [operatorUnlocked, setOperatorUnlocked] = useState(false);
   const onChainBusyRef = useRef(false);
-
-  useEffect(() => {
-    try {
-      if (window.sessionStorage.getItem(OP_UNLOCK_KEY) === "1") setOperatorUnlocked(true);
-    } catch {
-      // ignore
-    }
-  }, []);
+  const treasuryPromiseRef = useRef<Promise<RialoWallet> | null>(null);
 
   useEffect(() => {
     try {
@@ -624,44 +569,35 @@ export function AstraeonProvider({ children }: { children: ReactNode }) {
       }
       setRememberKeyState(remember);
 
-      const persistWallet = (wallet: RialoWallet) => {
-        try {
-          const payload = remember ? wallet : sanitizeWallet(wallet);
-          window.localStorage.setItem(WALLET_KEY, JSON.stringify(payload));
-        } catch {
-          // storage may be unavailable; ignore
-        }
-      };
-
+      // Viewing does not require a wallet. Only a previously remembered key is
+      // restored so signing keeps working across reloads; otherwise the wallet
+      // is created lazily on the first action that needs it.
       try {
         const raw = window.localStorage.getItem(WALLET_KEY);
         if (raw) {
           const parsed = JSON.parse(raw) as unknown;
-          if (isValidWallet(parsed)) {
-            if (parsed.privateKeyJwk && parsed.privateKeyJwk.length > 0) {
-              // Full wallet persisted (user opted in to remembering the key).
-              let wallet = parsed;
-              if (!parsed.settlementAddress) {
-                wallet = await withSettlement(parsed);
-                persistWallet(wallet);
+          if (isValidWallet(parsed) && parsed.privateKeyJwk && parsed.privateKeyJwk.length > 0) {
+            let wallet = parsed;
+            if (!parsed.settlementAddress) {
+              wallet = await withSettlement(parsed);
+              try {
+                window.localStorage.setItem(
+                  WALLET_KEY,
+                  JSON.stringify(remember ? wallet : sanitizeWallet(wallet)),
+                );
+              } catch {
+                // ignore
               }
-              if (cancelled) return;
-              setTreasury(wallet);
-              void probe(wallet.address);
-              return;
             }
-            // Only public parts persisted: the signing key was not kept, so a
-            // fresh session wallet is generated.
+            if (cancelled) return;
+            setTreasury(wallet);
+            void probe(wallet.address);
           }
         }
       } catch {
-        // fall through to generation
+        // ignore
       }
-      const wallet = await generateWallet();
-      if (cancelled) return;
-      setTreasury(wallet);
-      persistWallet(wallet);
-      void probe(wallet.address);
+      void probe();
     };
     void init();
     return () => {
@@ -743,6 +679,30 @@ export function AstraeonProvider({ children }: { children: ReactNode }) {
         events: s.events.map((e) => (e.id === eventId ? { ...e, ...patch } : e)),
       }));
 
+    // Creates the operator wallet on demand. Viewing never requires it; the
+    // first action that needs a signer triggers creation.
+    const ensureTreasury = async (): Promise<RialoWallet | null> => {
+      if (treasury) return treasury;
+      if (treasuryPromiseRef.current) return treasuryPromiseRef.current;
+      const promise = generateWallet().then((wallet) => {
+        setTreasury(wallet);
+        try {
+          const payload = rememberKey ? wallet : sanitizeWallet(wallet);
+          window.localStorage.setItem(WALLET_KEY, JSON.stringify(payload));
+        } catch {
+          // storage may be unavailable; ignore
+        }
+        void executor.connect(wallet.address).then((info) => setConnection(info));
+        return wallet;
+      });
+      treasuryPromiseRef.current = promise;
+      try {
+        return await promise;
+      } finally {
+        treasuryPromiseRef.current = null;
+      }
+    };
+
     return {
       state,
       metrics: computeMetrics(state),
@@ -750,26 +710,7 @@ export function AstraeonProvider({ children }: { children: ReactNode }) {
       chainInfo,
       treasury,
       rememberKey,
-      operatorUnlocked,
-      operatorPasscode: OPERATOR_PASSCODE,
-      unlockOperator: (code) => {
-        if (code !== OPERATOR_PASSCODE) return false;
-        setOperatorUnlocked(true);
-        try {
-          window.sessionStorage.setItem(OP_UNLOCK_KEY, "1");
-        } catch {
-          // ignore
-        }
-        return true;
-      },
-      lockOperator: () => {
-        setOperatorUnlocked(false);
-        try {
-          window.sessionStorage.removeItem(OP_UNLOCK_KEY);
-        } catch {
-          // ignore
-        }
-      },
+      ensureTreasury,
       setRememberKey: (value) => {
         setRememberKeyState(value);
         try {
@@ -793,11 +734,11 @@ export function AstraeonProvider({ children }: { children: ReactNode }) {
       },
       refreshChainInfo,
       fundTreasury: async () => {
-        if (!operatorUnlocked) return null;
-        if (!treasury) return null;
+        const wallet = await ensureTreasury();
+        if (!wallet) return null;
         const result = await executor.executeOnChain(
           { agentId: "operator", agentName: "Operator Wallet", actionLabel: "OPERATOR FUNDING" },
-          { address: treasury.address, kelvins: 1_000_000_000, cooldownMs: 0 },
+          { address: wallet.address, kelvins: 1_000_000_000, cooldownMs: 0 },
         );
         if (!result.simulated) {
           run((s) => ({
@@ -823,7 +764,6 @@ export function AstraeonProvider({ children }: { children: ReactNode }) {
         return result;
       },
       submitAction: async (request, opts) => {
-        if (!operatorUnlocked) return lockedResult(request);
         const result = guard(request, {
           agents: state.agents,
           policies: state.policies,
@@ -838,10 +778,10 @@ export function AstraeonProvider({ children }: { children: ReactNode }) {
           opts?.onChain !== false &&
           result.execution &&
           result.event.status === "EXECUTED" &&
-          (result.event.amountUsd ?? 0) > 0 &&
-          treasury
+          (result.event.amountUsd ?? 0) > 0
         ) {
-          if (onChainBusyRef.current) return result;
+          const wallet = await ensureTreasury();
+          if (!wallet || onChainBusyRef.current) return result;
           onChainBusyRef.current = true;
           try {
             const real = await executor.executeOnChain(
@@ -853,9 +793,9 @@ export function AstraeonProvider({ children }: { children: ReactNode }) {
                 amountUsd: result.event.amountUsd,
               },
               {
-                address: treasury.address,
-                recipient: treasury.settlementAddress,
-                privateKeyJwk: treasury.privateKeyJwk,
+                address: wallet.address,
+                recipient: wallet.settlementAddress,
+                privateKeyJwk: wallet.privateKeyJwk,
               },
             );
             if (!real.simulated) {
@@ -874,7 +814,6 @@ export function AstraeonProvider({ children }: { children: ReactNode }) {
         return result;
       },
       approveAction: async (eventId) => {
-        if (!operatorUnlocked) return;
         const ev = state.events.find((e) => e.id === eventId);
         const agent = ev ? state.agents.find((a) => a.id === ev.agentId) : undefined;
         if (!ev || !agent) return;
@@ -885,26 +824,29 @@ export function AstraeonProvider({ children }: { children: ReactNode }) {
           asset: ev.asset,
           amountUsd: ev.amountUsd,
         });
-        if (treasury && !onChainBusyRef.current && (ev.amountUsd ?? 0) > 0) {
-          onChainBusyRef.current = true;
-          try {
-            const real = await executor.executeOnChain(
-              {
-                agentId: agent.id,
-                agentName: agent.name,
-                actionLabel: ev.actionLabel,
-                asset: ev.asset,
-                amountUsd: ev.amountUsd,
-              },
-              {
-                address: treasury.address,
-                recipient: treasury.settlementAddress,
-                privateKeyJwk: treasury.privateKeyJwk,
-              },
-            );
-            if (!real.simulated) execution = real;
-          } finally {
-            onChainBusyRef.current = false;
+        if (!onChainBusyRef.current && (ev.amountUsd ?? 0) > 0) {
+          const wallet = await ensureTreasury();
+          if (wallet) {
+            onChainBusyRef.current = true;
+            try {
+              const real = await executor.executeOnChain(
+                {
+                  agentId: agent.id,
+                  agentName: agent.name,
+                  actionLabel: ev.actionLabel,
+                  asset: ev.asset,
+                  amountUsd: ev.amountUsd,
+                },
+                {
+                  address: wallet.address,
+                  recipient: wallet.settlementAddress,
+                  privateKeyJwk: wallet.privateKeyJwk,
+                },
+              );
+              if (!real.simulated) execution = real;
+            } finally {
+              onChainBusyRef.current = false;
+            }
           }
         }
         patchEvent(eventId, {
@@ -916,8 +858,7 @@ export function AstraeonProvider({ children }: { children: ReactNode }) {
         });
         run((s) => ({ ...s, pendingApprovals: s.pendingApprovals.filter((id) => id !== eventId) }));
       },
-      rejectAction: (eventId) => {
-        if (!operatorUnlocked) return;
+      rejectAction: (eventId) =>
         run((s) => ({
           ...s,
           events: s.events.map((e) =>
@@ -932,8 +873,7 @@ export function AstraeonProvider({ children }: { children: ReactNode }) {
               : e,
           ),
           pendingApprovals: s.pendingApprovals.filter((id) => id !== eventId),
-        }));
-      },
+        })),
       verifyOnChain: async (eventId) => {
         const ev = state.events.find((e) => e.id === eventId);
         if (!ev || !isRealOnChainHash(ev.txHash)) return null;
@@ -956,19 +896,13 @@ export function AstraeonProvider({ children }: { children: ReactNode }) {
           return null;
         }
       },
-      pauseAgent: (agentId, reason) => {
-        if (!operatorUnlocked) return;
-        run((s) => pauseAgent(s, agentId, reason));
-      },
-      resumeAgent: (agentId) => {
-        if (!operatorUnlocked) return;
+      pauseAgent: (agentId, reason) => run((s) => pauseAgent(s, agentId, reason)),
+      resumeAgent: (agentId) =>
         run((s) => ({
           ...s,
           agents: s.agents.map((a) => (a.id === agentId ? { ...a, status: "ACTIVE" } : a)),
-        }));
-      },
-      revokeAgent: (agentId) => {
-        if (!operatorUnlocked) return;
+        })),
+      revokeAgent: (agentId) =>
         run((s) => ({
           ...s,
           agents: s.agents.map((a) =>
@@ -984,22 +918,14 @@ export function AstraeonProvider({ children }: { children: ReactNode }) {
                 }
               : a,
           ),
-        }));
-      },
-      createAgent: (agent, policy) => {
-        if (!operatorUnlocked) return;
-        run((s) => ({ ...s, agents: [...s.agents, agent], policies: [...s.policies, policy] }));
-      },
-      updatePolicy: (policy) => {
-        if (!operatorUnlocked) return;
-        run((s) => ({ ...s, policies: s.policies.map((p) => (p.id === policy.id ? policy : p)) }));
-      },
-      reset: () => {
-        if (!operatorUnlocked) return;
-        run(() => seedState());
-      },
+        })),
+      createAgent: (agent, policy) =>
+        run((s) => ({ ...s, agents: [...s.agents, agent], policies: [...s.policies, policy] })),
+      updatePolicy: (policy) =>
+        run((s) => ({ ...s, policies: s.policies.map((p) => (p.id === policy.id ? policy : p)) })),
+      reset: () => run(() => seedState()),
     };
-  }, [state, connection, treasury, chainInfo, rememberKey, operatorUnlocked]);
+  }, [state, connection, treasury, chainInfo, rememberKey]);
 
   return <StoreContext.Provider value={api}>{children}</StoreContext.Provider>;
 }
