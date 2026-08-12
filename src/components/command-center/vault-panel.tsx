@@ -48,7 +48,7 @@ export function VaultPanel() {
             <p className="mt-1 text-[0.6rem] text-muted-foreground">
               {treasury
                 ? `generated ${new Date(treasury.createdAt).toLocaleString()}`
-                : "created automatically on your first on-chain action"}
+                : "click Generate Wallet (top right) to create it"}
             </p>
           </div>
           <div>
@@ -62,7 +62,7 @@ export function VaultPanel() {
               </Pill>
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-3">
-              <GoldSolidButton onClick={fund} disabled={funding}>
+              <GoldSolidButton onClick={fund} disabled={funding || !treasury}>
                 {funding ? "Funding…" : "Fund +1 RLO"}
               </GoldSolidButton>
               {fundResult ? (

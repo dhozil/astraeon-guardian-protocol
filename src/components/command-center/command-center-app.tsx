@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TempleMark, RialoMark } from "@/components/astraeon/primitives";
 import { useAstraeon } from "@/lib/astraeon/store";
@@ -142,7 +142,17 @@ function Header({
 
 export function CommandCenterApp() {
   const [tab, setTab] = useState<Tab>("overview");
-  const { state, connection, refreshConnection, treasury } = useAstraeon();
+  const [generating, setGenerating] = useState(false);
+  const { state, connection, refreshConnection, treasury, ensureTreasury } = useAstraeon();
+
+  const generateWallet = async () => {
+    setGenerating(true);
+    try {
+      await ensureTreasury();
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   const panels: Record<Tab, ReactNode> = {
     overview: <OverviewPanel />,
@@ -213,17 +223,31 @@ export function CommandCenterApp() {
                   ? `#${connection.blockHeight}`
                   : "offline"}
               </button>
-              <span
-                className="border border-hairline px-2.5 py-1.5 tracking-wider"
-                title="Operator wallet (created on first on-chain action)"
-              >
-                {treasury ? truncateAddress(treasury.address) : "wallet: —"}
-              </span>
-              {connection.balanceKelvin != null && connection.reachable ? (
-                <span className="border border-hairline px-2.5 py-1.5 tracking-wider text-gold/80">
-                  {(Number(connection.balanceKelvin) / 1_000_000_000).toFixed(2)} RLO
-                </span>
-              ) : null}
+              {treasury ? (
+                <>
+                  <span
+                    className="border border-hairline px-2.5 py-1.5 tracking-wider"
+                    title="Operator wallet"
+                  >
+                    {truncateAddress(treasury.address)}
+                  </span>
+                  {connection.balanceKelvin != null && connection.reachable ? (
+                    <span className="border border-hairline px-2.5 py-1.5 tracking-wider text-gold/80">
+                      {(Number(connection.balanceKelvin) / 1_000_000_000).toFixed(2)} RLO
+                    </span>
+                  ) : null}
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => void generateWallet()}
+                  disabled={generating}
+                  className="flex items-center gap-2 border border-gold/50 px-3 py-1.5 tracking-wider text-gold uppercase transition-colors hover:bg-gold/10 disabled:cursor-default disabled:opacity-50"
+                >
+                  <Wallet className="h-3.5 w-3.5" />
+                  {generating ? "Generating…" : "Generate Wallet"}
+                </button>
+              )}
             </div>
           }
         />
