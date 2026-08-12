@@ -6,6 +6,7 @@ import { Features } from "@/components/astraeon/features";
 import { FinalCta } from "@/components/astraeon/final-cta";
 import { Footer } from "@/components/astraeon/footer";
 import { Hero } from "@/components/astraeon/hero";
+import { HowItWorks } from "@/components/astraeon/how-it-works";
 import { Navbar } from "@/components/astraeon/navbar";
 import { PolicyEngine } from "@/components/astraeon/policy-engine";
 import { RealWorld } from "@/components/astraeon/real-world";
@@ -43,6 +44,7 @@ function Index() {
         <Architecture />
         <Features />
         <SecurityDemo />
+        <HowItWorks />
         <PolicyEngine />
         <CommandCenter />
         <RealWorld />

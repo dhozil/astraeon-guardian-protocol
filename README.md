@@ -44,6 +44,29 @@ Astraeon does not replace agents. It is the trust infrastructure that lets agent
 
 ---
 
+## How it works
+
+Every action an agent takes flows through the same pipeline — bounded at each
+step, recorded end to end:
+
+1. **Agent requests** — an agent (or the operator) submits an action: a buy, a
+   swap, an API call, a transfer. It asks for a path, never for a credential.
+2. **Guard evaluates** — Astraeon checks identity, permissions, policy,
+   budgets, velocity, and destinations. Every check passes or fails with a
+   reason.
+3. **Risk scores** — the risk engine rates the action 0–100 (SAFE → CRITICAL).
+   High-risk actions route to approvals or are blocked outright.
+4. **Executes on Rialo** — allowed actions run on-chain through the deployed
+   guard program, or as a signed transaction, on Rialo DevNet.
+5. **Audited & verifiable** — every action is logged; real transactions can be
+   verified on-chain (block, fee, program logs straight from the node).
+
+The boundary is enforced **on-chain** by a deployed Rialo guard program
+(`evaluate` instruction) — the decision is made by the chain, and the frontend
+can only ask.
+
+---
+
 ## What it does
 
 | Capability               | What it means                                                                                 |
